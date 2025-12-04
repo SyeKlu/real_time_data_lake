@@ -2,7 +2,7 @@ version: "3"
 
 services:
   catalog:
-    image: projectnessie/nessie
+    image: ghcr.io/projectnessie/nessie
     container_name: catalog
     networks:
       data-lake-network:
@@ -139,14 +139,42 @@ services:
                kafka-topics --bootstrap-server kafka:9092 --create --topic client_topic --if-not-exists --partitions 1 --replication-factor 1;
                wait"
 
-  spark:
+  spark-master:
+    image: bitnamilegacy/spark:3.5.6
+    container_name: spark-master
+    networks:
+      - data-lake-network
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "7077:7077"
+      - "8088:8080"
+    volumes:
+      - ./spark-jobs:/app
+
+  spark-worker:
     build:
       context: .
       dockerfile: ./spark/Dockerfile
-    container_name: spark-master
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    depends_on:
+      - spark-master
+    networks:
+      - data-lake-network
     ports:
-      - 7077:7077
-      - 8088:8080
+      - "8081:8081"
+
+  spark-jobs:
+    depends_on:
+      - spark-master
+      - spark-worker
+    build:
+      context: .
+      dockerfile: ./spark/Dockerfile
+    container_name: spark-jobs
     networks:
       - data-lake-network
     environment:
@@ -157,7 +185,7 @@ services:
       - ./spark-jobs:/app
     command: >
       /opt/bitnami/spark/bin/spark-submit
-      --master local[*]
+      --master spark://spark-master:7077
       --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions
       --conf spark.sql.catalog.nessie=org.apache.iceberg.spark.SparkCatalog
       --conf spark.sql.catalog.nessie.catalog-impl=org.apache.iceberg.nessie.NessieCatalog

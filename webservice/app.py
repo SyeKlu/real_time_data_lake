@@ -26,6 +26,7 @@ MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "storage:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "admin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "password")
 UPLOADS_BUCKET_NAME = os.getenv("UPLOADS_BUCKET_NAME", "uploads")
+WAREHOUSE_BUCKET_NAME = os.getenv("WAREHOUSE_BUCKET_NAME","warehouse")
 minio_client = Minio(
     MINIO_ENDPOINT,
     access_key=MINIO_ACCESS_KEY,
@@ -38,6 +39,11 @@ def ensure_bucket_exists():
     if not minio_client.bucket_exists(UPLOADS_BUCKET_NAME):
         try:
             minio_client.make_bucket(UPLOADS_BUCKET_NAME)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Bucket creation error: {str(e)}")
+    if not minio_client.bucket_exists(WAREHOUSE_BUCKET_NAME):
+        try:
+            minio_client.make_bucket(WAREHOUSE_BUCKET_NAME)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Bucket creation error: {str(e)}")
 
